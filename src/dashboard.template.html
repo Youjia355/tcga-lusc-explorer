@@ -1,65 +1,40 @@
 <!doctype html>
 <html lang="en">
+<head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Lung Cancer Explorer</title>
+<title>TCGA-LUSC Explorer</title>
 <style>
-*{box-sizing:border-box}body{margin:0;background:#eff3f0;color:#182a24;font:16px/1.5 system-ui,sans-serif}main{max-width:1080px;margin:auto;padding:45px 24px}h1{font-size:clamp(30px,6vw,52px);line-height:1.05;margin:.25em 0}header p{margin:.5em 0 1.6em}.kicker{font-size:.88rem;font-weight:750;color:#126248}.controls,.panel{background:#fff;border:1px solid #cdd9d1;border-radius:14px;padding:20px}.controls{margin-bottom:18px}label{font-weight:700}select{padding:8px;font:inherit;margin-left:8px;border:1px solid #6b8276;border-radius:6px;background:white}.grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}h2{font-size:21px;margin:0 0 6px}p{margin:0 0 12px}.meta{font-size:.89rem;color:#3d554b;margin:12px 0 0}button.gene{display:grid;grid-template-columns:65px 1fr 62px;align-items:center;gap:8px;width:100%;margin:5px 0;border:1px solid transparent;border-radius:7px;background:white;text-align:left;padding:8px;font:inherit;cursor:pointer}button.gene[aria-pressed=true]{background:#e2f2ea;border-color:#126248;font-weight:700}.track{background:#e8eeea;height:12px;border-radius:4px}.bar{display:block;background:#167457;height:100%;border-radius:4px}.rate{text-align:right;font-variant-numeric:tabular-nums}.hist{display:flex;height:195px;align-items:end;gap:4px;border-left:1px solid #577064;border-bottom:1px solid #577064;padding:0 4px}.bin{flex:1;background:#167457;min-width:0}.ticks{display:flex;justify-content:space-between}.axis{text-align:center;margin-top:8px}.axis-y{font-size:.9rem;font-weight:650;margin:18px 0 6px}footer{font-size:.85rem;margin-top:20px}a{color:#075741}button:focus-visible,select:focus-visible,summary:focus-visible{outline:3px solid #765710;outline-offset:2px}@media(max-width:720px){.grid{grid-template-columns:1fr}}
+:root{font:16px/1.5 Inter,system-ui,sans-serif;color:#192d29;--a:#13746a;--b:#9d4c22;--border:#d1ddd8;--muted:#48615a}
+*{box-sizing:border-box}body{margin:0;background:#f1f5f3}main{max-width:1440px;margin:auto;padding:36px 24px}header{margin-bottom:22px}h1{font-size:clamp(2rem,5vw,3.2rem);line-height:1.1;margin:4px 0 8px}h2,h3,p{margin:0 0 10px}h2{font-size:1.25rem}h3{font-size:1rem}.eyebrow{color:var(--a);font-weight:750}p,small{color:var(--muted)}.panel,.toolbar{background:#fff;border:1px solid var(--border);border-radius:12px;padding:18px}.toolbar{display:flex;align-items:end;flex-wrap:wrap;gap:14px;margin-bottom:16px}.layout{display:grid;grid-template-columns:minmax(0,2fr) minmax(285px,1fr);gap:16px}.cohorts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-bottom:16px}.cohort{border-top:4px solid var(--a)}.cohort.b{border-top-color:var(--b)}.filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}label{display:grid;font-weight:650;font-size:.85rem;gap:3px}select,button{font:inherit;border:1px solid #82988e;background:#fff;border-radius:6px;padding:6px;color:inherit}button{cursor:pointer}button:focus-visible,select:focus-visible{outline:3px solid #876721;outline-offset:2px}.aside{display:grid;align-content:start;gap:16px}.gene{display:grid;grid-template-columns:62px 1fr 54px;gap:6px;align-items:center;width:100%;margin:5px 0;text-align:left;border-color:transparent;padding:4px 5px}.gene[aria-pressed=true]{background:#e7f0ed;border-color:#628f82;font-weight:700}.track{background:#e9efed;height:10px;border-radius:4px}.fill{display:block;height:100%;background:var(--a);border-radius:4px}.b .fill{background:var(--b)}.value{text-align:right;font-size:.82rem}.legend{display:flex;gap:16px;font-size:.88rem;margin-bottom:8px}.legend span::before{content:'';display:inline-block;width:14px;border-top:3px solid var(--a);margin-right:6px;vertical-align:middle}.legend .b::before{border-top:3px dashed var(--b)}svg{width:100%;height:auto;display:block}.axis{stroke:#749087;stroke-width:1}.gridline{stroke:#dce6e2;stroke-width:1}svg text{font:11px system-ui;fill:#28423b}.metric{margin:8px 0}.metric strong{display:block;font-size:.88rem}.barline{display:grid;grid-template-columns:18px 1fr 40px;align-items:center;gap:5px;font-size:.78rem}.heat{width:100%;border-spacing:4px;text-align:center;font-size:.87rem}.heat th{text-align:left}.heat td{padding:3px;border:1px solid #d1ddd8;font-variant-numeric:tabular-nums}.risk{width:100%;font-size:.84rem;text-align:center;border-collapse:collapse}.risk th,.risk td{padding:4px 2px;border-bottom:1px solid var(--border)}.risk th:first-child{text-align:left}footer{margin-top:20px;font-size:.85rem}a{color:#155e52}@media(max-width:960px){.layout{grid-template-columns:1fr}.aside{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:640px){main{padding:20px 12px}.cohorts,.aside{grid-template-columns:1fr}}
 </style>
+</head>
+<body>
 <main>
-<header><div class="kicker">TCGA-LUSC · PanCancer Atlas</div><h1>Lung Cancer Explorer</h1><p>Explore mutation frequency and RNA expression in primary lung squamous cell carcinoma samples.</p></header>
-<div class="controls"><label for="stage">Pathologic stage</label><select id="stage"></select><p class="meta" id="coverage" aria-live="polite"></p></div>
-<div class="grid">
-<section class="panel"><h2>Mutation frequency</h2><p>Eight selected genes. Choose a gene to see its expression distribution.</p><div id="ranking"></div><p class="meta" id="denominator"></p></section>
-<section class="panel"><h2 id="expression-title"></h2><p id="expression-meta" aria-live="polite"></p><div id="histogram"></div><details id="hist-details"><summary>View histogram counts</summary><ul id="hist-counts"></ul></details></section>
+<header><div class="eyebrow">PanCancer Atlas · Lung squamous cell carcinoma</div><h1>TCGA-LUSC Explorer</h1><p>Compare two groups of patients across molecular and clinical measures.</p></header>
+<div class="toolbar">
+<label>Shared gene<select id="gene"></select></label>
+<label>Group expression by<select id="group"><option value="stage_boxes">Pathologic stage</option><option value="status_boxes">Mutation status</option></select></label>
+<button id="reset" type="button">Reset filters</button>
+<p id="selection" aria-live="polite"></p>
 </div>
-<footer>Source: <a href="https://www.cbioportal.org/study/summary?id=lusc_tcga_pan_can_atlas_2018">cBioPortal TCGA-LUSC PanCancer Atlas study</a>. Data generated by the TCGA Research Network.</footer>
+<div class="layout">
+<div>
+<div class="cohorts" id="cohorts"></div>
+<section class="panel">
+<h2>Overall survival comparison</h2><div class="legend"><span>Cohort A</span><span class="b">Cohort B</span></div>
+<div id="survival"></div><div id="risk"></div><p><small>Kaplan–Meier estimates. Tick marks indicate censoring. Cohorts can overlap when filters overlap.</small></p>
+</section>
+</div>
+<aside class="aside">
+<section class="panel"><h2>Clinical stage distribution</h2><div id="stages"></div></section>
+<section class="panel"><h2>Data availability</h2><div id="availability"></div></section>
+<section class="panel"><h2>Expression heatmap</h2><p><small>Mean log₂(RSEM + 1) by gene and cohort. Darker cells indicate higher means.</small></p><div id="heatmap"></div></section>
+</aside>
+</div>
+<footer>Data generated by the TCGA Research Network. <a href="https://www.cbioportal.org/study/summary?id=lusc_tcga_pan_can_atlas_2018">cBioPortal TCGA-LUSC PanCancer Atlas study</a>.</footer>
 </main>
-<script>
-const data = __DASHBOARD_DATA__;
-const stage = document.querySelector('#stage');
-const get = id => document.getElementById(id);
-let gene = 'TP53';
-for (const group of Object.keys(data)) {
-  stage.add(new Option(group === 'All stages' || group === 'Unknown' ? group : 'Stage ' + group, group));
-}
-function render() {
-  const cohort = data[stage.value];
-  const ranked = Object.entries(cohort.genes).sort((a, b) => b[1].mutated - a[1].mutated || a[0].localeCompare(b[0]));
-  get('coverage').textContent = `${cohort.primary} patients with a primary sample · ${cohort.mutation} mutation-profiled · ${cohort.expression} RNA-profiled · ${cohort.overlap} with both`;
-  get('denominator').textContent = `Denominator: ${cohort.mutation} mutation-profiled patients in this group. Each patient is counted once per gene. Bars use a 0–100% scale.`;
-  get('ranking').replaceChildren(...ranked.map(([name, record]) => {
-    const button = document.createElement('button');
-    button.className = 'gene';
-    button.setAttribute('aria-pressed', name === gene);
-    const rate = cohort.mutation ? 100 * record.mutated / cohort.mutation : null;
-    button.innerHTML = `<span>${name}</span><span class="track"><span class="bar" style="width:${rate ?? 0}%"></span></span><span class="rate">${rate === null ? '—' : rate.toFixed(1) + '%'}</span>`;
-    button.title = `${record.mutated} of ${cohort.mutation} profiled patients`;
-    button.setAttribute('aria-label', `${name}, ${rate === null ? 'no profiled patients' : button.title + ', ' + rate.toFixed(1) + ' percent'}`);
-    button.onclick = () => {
-      gene = name;
-      for (const row of get('ranking').querySelectorAll('button')) row.setAttribute('aria-pressed', row === button);
-      renderExpression();
-    };
-    return button;
-  }));
-  renderExpression();
-}
-function renderExpression() {
-  const {n, bins, limit} = data[stage.value].genes[gene];
-  get('expression-title').textContent = `${gene} expression`;
-  get('expression-meta').textContent = `${n} primary samples with an expression value.`;
-  const histogram = get('histogram');
-  get('hist-details').hidden = !n;
-  if (!n) {
-    histogram.textContent = 'No expression values for this stage and gene.';
-    return;
-  }
-  const peak = Math.max(...bins);
-  histogram.innerHTML = `<div class="axis-y">Primary samples per bin · scale 0–${peak}</div><div class="hist" aria-hidden="true">${bins.map((count, i) => `<div class="bin" style="height:${100 * count / peak}%" title="${(limit * i / 12).toFixed(2)}–${(limit * (i + 1) / 12).toFixed(2)}: ${count} samples"></div>`).join('')}</div><div class="ticks"><span>0</span><span>${limit}</span></div><div class="axis">log₂(RSEM + 1)</div>`;
-  get('hist-counts').innerHTML = bins.map((count, i) => `<li>${(limit * i / 12).toFixed(2)}–${(limit * (i + 1) / 12).toFixed(2)}: ${count}</li>`).join('');
-}
-stage.onchange = render;
-render();
-</script>
+<script id="dashboard-data" type="application/json">__DASHBOARD_DATA__</script>
+<script>__DASHBOARD_CODE__</script>
+</body>
 </html>
