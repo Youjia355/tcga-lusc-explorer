@@ -1,0 +1,41 @@
+{
+  "clinical_patients": 487,
+  "stage_counts": {
+    "All stages": {
+      "primary": 487,
+      "mutation": 484,
+      "expression": 484,
+      "overlap": 481
+    },
+    "I": {
+      "primary": 236,
+      "mutation": 235,
+      "expression": 235,
+      "overlap": 234
+    },
+    "II": {
+      "primary": 158,
+      "mutation": 156,
+      "expression": 157,
+      "overlap": 155
+    },
+    "III": {
+      "primary": 83,
+      "mutation": 83,
+      "expression": 82,
+      "overlap": 82
+    },
+    "IV": {
+      "primary": 7,
+      "mutation": 7,
+      "expression": 7,
+      "overlap": 7
+    },
+    "Unknown": {
+      "primary": 3,
+      "mutation": 3,
+      "expression": 3,
+      "overlap": 3
+    }
+  }
+}
