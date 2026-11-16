@@ -8,7 +8,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from subprocess import run
 
-ROOT = Path(__file__).resolve().parent
+ROOT = Path(__file__).resolve().parents[1]
 CACHE = ROOT / ".cache"
 STUDY = "lusc_tcga_pan_can_atlas_2018"
 API = "https://www.cbioportal.org/api"
@@ -114,9 +114,9 @@ def prepare():
     audit = {"clinical_patients": len(patients),
              "stage_counts": {stage: {key: value for key, value in counts.items() if key != "genes"}
                               for stage, counts in data.items()}}
-    (ROOT / "join_audit.json").write_text(json.dumps(audit, indent=2) + "\n")
-    template = (ROOT / "dashboard.template.html").read_text()
-    (ROOT / "index.html").write_text(template.replace("__DASHBOARD_DATA__", json.dumps(data)))
+    (ROOT / "data" / "join_audit.json").write_text(json.dumps(audit, indent=2) + "\n")
+    template = (ROOT / "src" / "dashboard.template.html").read_text()
+    (ROOT / "docs" / "index.html").write_text(template.replace("__DASHBOARD_DATA__", json.dumps(data)))
     print(json.dumps(audit, indent=2))
 
 if __name__ == "__main__":
