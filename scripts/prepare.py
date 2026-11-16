@@ -129,6 +129,17 @@ def prepare():
     fields_by_sample = {sample: clinical[patient] for sample, patient in pairs}
     age_by_sample = {sample: age_group(fields.get("AGE")) for sample, fields in fields_by_sample.items()}
     sex_by_sample = {sample: fields.get("SEX") for sample, fields in fields_by_sample.items()}
+    ethnicity_labels = {"Not Hispanic Or Latino": "Not Hispanic or Latino",
+                        "Hispanic Or Latino": "Hispanic or Latino"}
+    ethnicity_by_sample = {
+        sample: ethnicity_labels.get(fields.get("ETHNICITY"), "Not recorded")
+        for sample, fields in fields_by_sample.items()
+    }
+    radiation_by_sample = {
+        sample: fields.get("RADIATION_THERAPY") if fields.get("RADIATION_THERAPY") in ("Yes", "No")
+        else "Not recorded"
+        for sample, fields in fields_by_sample.items()
+    }
     survival = {sample: record for sample, fields in fields_by_sample.items()
                 if (record := survival_record(fields)) is not None}
     mutations_by_gene = {}
@@ -178,6 +189,9 @@ def prepare():
                 cohorts["|".join((stage, sex, age))] = {
                     "primary": len(ids), "mutation": len(profiled), "expression": len(rna),
                     "overlap": len(profiled & rna), "stages": dict(counts), "genes": genes,
+                    "ages": dict(Counter(age_by_sample[sample] for sample in ids)),
+                    "ethnicities": dict(Counter(ethnicity_by_sample[sample] for sample in ids)),
+                    "radiation": dict(Counter(radiation_by_sample[sample] for sample in ids)),
                     "survival": kaplan_meier([survival[sample] for sample in ids if sample in survival]),
                 }
     stage_counts = {}

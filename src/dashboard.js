@@ -4,6 +4,8 @@ const stages = data.filters.stage.slice(1);
 const all = data.cohorts['All|All|All'];
 const genes = Object.keys(all.genes).sort((a,b) => all.genes[b].mutated - all.genes[a].mutated);
 const names = ['A', 'B'];
+get('case-total').textContent = all.primary;
+get('stage-target').value = 'A';
 const colors = ['#13746a', '#9d4c22'];
 const defaults = [{stage:'I',sex:'All',age:'All'}, {stage:'II',sex:'All',age:'All'}];
 const filters = defaults.map(item => ({...item}));
@@ -115,6 +117,84 @@ function survivalPlot(cohorts) {
     times.map(t => `<td>${survival.steps.find(step => step[0] >= t)?.[3] ?? 0}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
 }
 
+const coverageRows = [
+  ['Clinical records', c => c.primary],
+  ['RNA expression', c => c.expression],
+  ['Somatic mutation', c => c.mutation],
+  ['Both molecular assays', c => c.overlap],
+  ['Usable overall survival', c => c.survival.n],
+];
+const percent = (n, total) => total ? (100 * n / total).toFixed(1) + '%' : '—';
+
+function distribution(cohorts, key, labels, donut = false) {
+  const palette = ['#366780', '#bb652a', '#a1a9a6'];
+  return cohorts.map((cohort, index) => {
+    let start = 0;
+    const segments = [];
+    const rows = labels.map((label, j) => {
+      const count = cohort[key][label] ?? 0;
+      const width = cohort.primary ? 100 * count / cohort.primary : 0;
+      if (width) segments.push(`${palette[j]} ${start}% ${start + width}%`);
+      start += width;
+      const bar = donut ? '' : `<span class="track"><span class="fill" style="width:${width}%;background:${palette[j]}"></span></span>`;
+      return `<li><span><span class="dot" aria-hidden="true" style="background:${palette[j]}"></span>${label}</span>
+        <span>${count} · ${percent(count, cohort.primary)}</span>${bar}</li>`;
+    }).join('');
+    const ring = donut && segments.length
+      ? `<div class="donut" aria-hidden="true" style="--segments:conic-gradient(${segments.join(',')})"></div>` : '';
+    return `<section><h3>Cohort ${names[index]} · n = ${cohort.primary}</h3>${ring}<ul class="composition">${rows}</ul></section>`;
+  }).join('');
+}
+
+function cohortTable(rows, cohorts, heading) {
+  return `<table class="risk"><thead><tr><th scope="col">${heading}</th>
+    <th scope="col">Cohort A</th><th scope="col">Cohort B</th></tr></thead><tbody>${
+    rows.map(([label, value]) => `<tr><th scope="row">${label}</th>${
+      cohorts.map(cohort => `<td>${value(cohort)}</td>`).join('')}</tr>`).join('')
+  }</tbody></table>`;
+}
+
+function setStage(stage) {
+  const name = get('stage-target').value;
+  const index = names.indexOf(name);
+  filters[index].stage = stage;
+  get('stage' + name).value = stage;
+  render();
+  if (stage !== 'All') get('stage-jump').querySelector('[aria-pressed="true"]')?.focus();
+}
+
+function renderStageNavigation() {
+  const index = names.indexOf(get('stage-target').value);
+  const {stage, sex, age} = filters[index];
+  const base = data.cohorts[['All', sex, age].join('|')];
+  get('stage-jump').replaceChildren(...stages.map(value => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'stage-button';
+    button.setAttribute('aria-pressed', value === stage);
+    const count = base.stages[value] ?? 0;
+    button.innerHTML = `<span>${stageLabel(value)}</span><span>${count} · ${percent(count,base.primary)}</span>`;
+    button.onclick = () => setStage(value);
+    return button;
+  }));
+}
+
+function renderOverview(cohorts, gene) {
+  get('age-overview').innerHTML = distribution(cohorts, 'ages', ['Under 65', '65 and older', 'Unknown']);
+  get('ethnicity-overview').innerHTML = distribution(cohorts, 'ethnicities',
+    ['Not Hispanic or Latino', 'Hispanic or Latino', 'Not recorded'], true);
+  get('treatment').innerHTML = distribution(cohorts, 'radiation', ['Yes', 'No', 'Not recorded']);
+  get('assays').innerHTML = cohortTable(coverageRows.map(([label, count]) => [
+    label, cohort => `${count(cohort)} / ${cohort.primary} · ${percent(count(cohort), cohort.primary)}`,
+  ]), cohorts, 'Data type');
+  get('summary-table').innerHTML = cohortTable([
+    ...coverageRows,
+    [gene + ' mutation detected', cohort => `${cohort.genes[gene].mutated} / ${cohort.mutation}`],
+    ['Observed deaths', cohort => cohort.survival.events],
+  ], cohorts, 'Measure');
+  renderStageNavigation();
+}
+
 function render() {
   const cohorts = filters.map(({stage,sex,age}) => data.cohorts[[stage,sex,age].join('|')]);
   const gene = get('gene').value;
@@ -157,8 +237,11 @@ function render() {
       return mean === null ? '<td>—</td>' : `<td style="background:rgba(19,116,106,${0.08+0.42*mean/maxMean})">${mean.toFixed(2)}</td>`;
     }).join('')}</tr>`).join('')}</tbody></table>`;
   survivalPlot(cohorts);
+  renderOverview(cohorts, gene);
 }
 
+get('stage-target').onchange = renderStageNavigation;
+get('clear-stage').onclick = () => setStage('All');
 get('gene').onchange = render;
 get('group').onchange = render;
 get('reset').onclick = () => {
@@ -166,6 +249,7 @@ get('reset').onclick = () => {
     filters[index] = {...defaults[index]};
     for (const [field,value] of Object.entries(filters[index])) get(field+name).value = value;
   }
+  get('stage-target').value = 'A';
   get('gene').value = genes[0];
   get('group').value = 'stage_boxes';
   render();
