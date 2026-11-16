@@ -34,6 +34,52 @@ def stage_group(value):
     match = re.fullmatch(r"STAGE (IV|III|II|I)[ABC]?", value.upper().strip())
     return match[1] if match else "Unknown"
 
+def age_group(value):
+    try:
+        age = float(value)
+    except (TypeError, ValueError):
+        return "Unknown"
+    if not math.isfinite(age) or age < 0:
+        return "Unknown"
+    return "Under 65" if age < 65 else "65 and older"
+
+def box_summary(values):
+    if not values:
+        return None
+    ordered = sorted(values)
+    def quantile(q):
+        offset = (len(ordered) - 1) * q
+        index = int(offset)
+        fraction = offset - index
+        return round(ordered[index] * (1 - fraction) +
+                     ordered[min(index + 1, len(ordered) - 1)] * fraction, 3)
+    return [round(ordered[0], 3), quantile(.25), quantile(.5), quantile(.75),
+            round(ordered[-1], 3), len(ordered)]
+
+def survival_record(fields):
+    status = fields.get("OS_STATUS", "")
+    try:
+        months = float(fields.get("OS_MONTHS", ""))
+    except (TypeError, ValueError):
+        return None
+    if status not in ("0:LIVING", "1:DECEASED") or not math.isfinite(months) or months < 0:
+        return None
+    return months, status == "1:DECEASED"
+
+def kaplan_meier(records):
+    times = {}
+    for time, event in records:
+        counts = times.setdefault(time, [0, 0])
+        counts[0 if event else 1] += 1
+    at_risk = len(records)
+    probability = 1.0
+    steps = []
+    for time, (events, censored) in sorted(times.items()):
+        probability *= 1 - events / at_risk
+        steps.append([round(time, 5), round(probability, 6), censored, at_risk, events])
+        at_risk -= events + censored
+    return {"n": len(records), "events": sum(event for _, event in records), "steps": steps}
+
 def prepare():
     CACHE.mkdir(exist_ok=True)
     jobs = {
@@ -51,9 +97,11 @@ def prepare():
     records = json.loads(files["clinical.json"].read_text())
     if len(records) >= 25000:
         raise ValueError("Clinical response may be incomplete; request paginated records.")
-    patients = {row["patientId"]: "Unknown" for row in records}
-    patients.update({row["patientId"]: stage_group(row["value"]) for row in records
-                     if row["clinicalAttributeId"] == "AJCC_PATHOLOGIC_TUMOR_STAGE"})
+    clinical = {}
+    for row in records:
+        clinical.setdefault(row["patientId"], {})[row["clinicalAttributeId"]] = row["value"]
+    patients = {patient: stage_group(fields.get("AJCC_PATHOLOGIC_TUMOR_STAGE", ""))
+                for patient, fields in clinical.items()}
     pairs = [(row["SAMPLE_ID"], row["PATIENT_ID"]) for row in tsv(files["data_clinical_sample.txt"])
              if row["SAMPLE_TYPE"] == "Primary" and row["PATIENT_ID"] in patients]
     multiplicity = Counter(patient for _, patient in pairs)
@@ -78,45 +126,75 @@ def prepare():
     if set(expression) != set(GENES) or not sequenced:
         raise ValueError("Missing gene expression rows or mutation-profiled cases.")
 
-    data = {}
-    for stage in ("All stages", *STAGES):
-        sample_ids = {sample for sample, value in sample_stage.items()
-                      if stage == "All stages" or stage == value}
-        profiled = sequenced & sample_ids
-        rna = matrix_samples & sample_ids
-        data[stage] = {
-            "primary": len(sample_ids),
-            "mutation": len(profiled),
-            "expression": len(rna),
-            "overlap": len(profiled & rna),
-            "genes": {}
-        }
-        for gene in GENES:
-            mutations = json.loads(files[f"{gene}.json"].read_text())
-            if not isinstance(mutations, list):
-                raise ValueError(f"Unexpected mutation response for {gene}")
-            mutated = {row["sampleId"] for row in mutations}
-            values = sorted(round(math.log2(value + 1), 5) for sample, value in expression[gene].items()
-                            if sample in sample_ids and math.isfinite(value) and value >= 0)
-            data[stage]["genes"][gene] = {"mutated": len(mutated & profiled), "values": values}
-    # Publish histogram counts only. Keep the same x-axis bins across stages for each gene.
+    fields_by_sample = {sample: clinical[patient] for sample, patient in pairs}
+    age_by_sample = {sample: age_group(fields.get("AGE")) for sample, fields in fields_by_sample.items()}
+    sex_by_sample = {sample: fields.get("SEX") for sample, fields in fields_by_sample.items()}
+    survival = {sample: record for sample, fields in fields_by_sample.items()
+                if (record := survival_record(fields)) is not None}
+    mutations_by_gene = {}
+    log_expression = {}
     for gene in GENES:
-        all_values = data["All stages"]["genes"][gene]["values"]
-        limit = max(1, math.ceil(max(all_values, default=0)))
-        for cohort in data.values():
-            record = cohort["genes"][gene]
-            values = record.pop("values")
-            bins = [0] * 12
-            for value in values:
-                bins[min(11, int(12 * value / limit))] += 1
-            record.update(n=len(values), bins=bins, limit=limit)
-
-    audit = {"clinical_patients": len(patients),
-             "stage_counts": {stage: {key: value for key, value in counts.items() if key != "genes"}
-                              for stage, counts in data.items()}}
+        mutations = json.loads(files[f"{gene}.json"].read_text())
+        if not isinstance(mutations, list):
+            raise ValueError(f"Unexpected mutation response for {gene}")
+        mutations_by_gene[gene] = {row["sampleId"] for row in mutations} & sequenced
+        log_expression[gene] = {sample: math.log2(value + 1)
+                                for sample, value in expression[gene].items()
+                                if math.isfinite(value) and value >= 0}
+    filters = {
+        "stage": ("All", *STAGES),
+        "sex": ("All", "Female", "Male"),
+        "age": ("All", "Under 65", "65 and older", "Unknown"),
+    }
+    cohorts = {}
+    for stage in filters["stage"]:
+        for sex in filters["sex"]:
+            for age in filters["age"]:
+                ids = sorted(sample for sample in sample_stage
+                             if (stage == "All" or sample_stage[sample] == stage)
+                             and (sex == "All" or sex_by_sample[sample] == sex)
+                             and (age == "All" or age_by_sample[sample] == age))
+                cases = set(ids)
+                profiled = sequenced & cases
+                rna = matrix_samples & cases
+                counts = Counter(sample_stage[sample] for sample in ids)
+                genes = {}
+                for gene in GENES:
+                    mutated = mutations_by_gene[gene] & profiled
+                    values = log_expression[gene]
+                    matched = [sample for sample in ids if sample in values]
+                    stage_boxes = {group: box_summary([values[sample] for sample in matched
+                                                       if sample_stage[sample] == group])
+                                   for group in STAGES}
+                    status_boxes = {
+                        "Mutated": box_summary([values[s] for s in matched if s in mutated]),
+                        "No mutation detected": box_summary([values[s] for s in matched
+                                                              if s in profiled and s not in mutated]),
+                    }
+                    genes[gene] = {"mutated": len(mutated), "stage_boxes": stage_boxes,
+                                   "status_boxes": status_boxes,
+                                   "mean": round(sum(values[s] for s in matched) / len(matched), 3)
+                                   if matched else None}
+                cohorts["|".join((stage, sex, age))] = {
+                    "primary": len(ids), "mutation": len(profiled), "expression": len(rna),
+                    "overlap": len(profiled & rna), "stages": dict(counts), "genes": genes,
+                    "survival": kaplan_meier([survival[sample] for sample in ids if sample in survival]),
+                }
+    stage_counts = {}
+    for stage in filters["stage"]:
+        cohort = cohorts[f"{stage}|All|All"]
+        stage_counts["All stages" if stage == "All" else stage] = {
+            key: cohort[key] for key in ("primary", "mutation", "expression", "overlap")
+        }
+    audit = {"clinical_patients": len(patients), "stage_counts": stage_counts,
+             "overall_survival_usable": len(survival)}
+    data = {"filters": filters, "cohorts": cohorts}
     (ROOT / "data" / "join_audit.json").write_text(json.dumps(audit, indent=2) + "\n")
     template = (ROOT / "src" / "dashboard.template.html").read_text()
-    (ROOT / "docs" / "index.html").write_text(template.replace("__DASHBOARD_DATA__", json.dumps(data)))
+    javascript = (ROOT / "src" / "dashboard.js").read_text()
+    html = template.replace("__DASHBOARD_CODE__", javascript)
+    (ROOT / "docs" / "index.html").write_text(
+        html.replace("__DASHBOARD_DATA__", json.dumps(data, separators=(",", ":"))))
     print(json.dumps(audit, indent=2))
 
 if __name__ == "__main__":
