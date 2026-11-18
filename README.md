@@ -10,7 +10,7 @@ From the repository root on macOS:
 open docs/index.html
 ```
 
-You can also double-click `docs/index.html` in Finder. The generated page contains the data it needs, so no installation, server, or data download is needed to use it. Set pathologic stage, sex, and age filters independently for Cohorts A and B. Use the shared gene selector or click a mutation bar to update both expression box plots. Switch the expression grouping between clinical stage and mutation status. The survival curves, stage distribution, availability counts, and cohort-level expression heatmap follow the cohort filters.
+You can also double click `docs/index.html` in Finder. The generated page contains the data it needs, so no installation, server, or data download is needed to use it. Set pathologic stage, sex, and age filters independently for Cohorts A and B. Use the shared gene selector or click a mutation bar to update both expression box plots. Switch the expression grouping between clinical stage and mutation status. The survival curves, stage distribution, availability counts, and cohort-level expression heatmap follow the cohort filters.
 
 ## Repository structure
 
