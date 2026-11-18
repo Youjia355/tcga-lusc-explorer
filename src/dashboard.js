@@ -255,3 +255,313 @@ get('reset').onclick = () => {
   render();
 };
 render();
+
+// ---------- Shared helpers for the patient-level views ----------
+const patients = data.patients;
+const escapeHtml = value => String(value).replace(/[&<>"']/g, ch =>
+  ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[ch]);
+const mutationColors = {Truncating:'#1d1d1d', Splice:'#e69f00', Missense:'#2f8a3b', 'In-frame':'#8a5a9e', Other:'#6b7d77'};
+const mutationOrder = Object.keys(mutationColors);
+const mainClass = list => mutationOrder.find(type => list.some(([kind]) => kind === type));
+const matchesFilter = (p, f) => (f.stage === 'All' || p.stage === f.stage)
+  && (f.sex === 'All' || p.sex === f.sex) && (f.age === 'All' || p.age_group === f.age);
+const scopePatients = scope => scope === 'All' ? patients
+  : patients.filter(p => matchesFilter(p, filters[names.indexOf(scope)]));
+const describeFilter = f => [f.stage === 'All' ? 'All stages' : f.stage === 'Unknown' ? 'Unknown stage' : stageLabel(f.stage),
+  f.sex === 'All' ? 'All sexes' : f.sex, f.age === 'All' ? 'All ages' : 'Age ' + f.age.toLowerCase()].join(' · ');
+const scopeLabel = scope => scope === 'All' ? 'all patients' : `Cohort ${scope}`;
+
+function refreshScopes() {
+  for (const select of document.querySelectorAll('select.scope')) {
+    const value = select.value || 'All';
+    select.replaceChildren(new Option('All patients', 'All'),
+      ...names.map((name, index) => new Option(`Cohort ${name} (${describeFilter(filters[index])})`, name)));
+    select.value = value;
+  }
+}
+
+function setSharedGene(gene) {
+  get('gene').value = gene;
+  render();
+  renderActiveTab();
+}
+
+// ---------- Tabs ----------
+const tabs = ['overview', 'matrix', 'patients'];
+let activeTab = 'overview';
+
+function showTab(name, focus = false) {
+  if (!tabs.includes(name)) name = 'overview';
+  activeTab = name;
+  for (const tab of tabs) {
+    const button = get('tab-' + tab);
+    button.setAttribute('aria-selected', tab === name);
+    button.tabIndex = tab === name ? 0 : -1;
+    get('view-' + tab).hidden = tab !== name;
+  }
+  if (focus) get('tab-' + name).focus();
+  try { history.replaceState(null, '', '#' + name); } catch { /* some browsers block this on file:// */ }
+  renderActiveTab();
+}
+
+function renderActiveTab() {
+  if (activeTab === 'matrix') renderMatrix();
+  if (activeTab === 'patients') renderTable();
+}
+
+for (const [index, tab] of tabs.entries()) {
+  const button = get('tab-' + tab);
+  button.onclick = () => showTab(tab);
+  button.onkeydown = event => {
+    const step = {ArrowRight: 1, ArrowLeft: -1}[event.key];
+    if (event.key === 'Home') showTab(tabs[0], true);
+    else if (event.key === 'End') showTab(tabs.at(-1), true);
+    else if (step) showTab(tabs[(index + step + tabs.length) % tabs.length], true);
+    else return;
+    event.preventDefault();
+  };
+}
+
+// ---------- Mutation matrix ----------
+const grey = '#c9cfcc';
+const tracks = [
+  ['Stage', p => p.stage, {I:'#cfe1ea', II:'#8fb8cc', III:'#4f8aa8', IV:'#1f4e66', Unknown:grey}, stageLabel],
+  ['Sex', p => p.sex, {Female:'#c06c94', Male:'#4c7fb0'}],
+  ['Age', p => p.age_group, {'Under 65':'#a8d0b0', '65 and older':'#3f7f55', Unknown:grey}],
+  ['Vital status', p => p.vital, {Living:'#d6cfb4', Deceased:'#3b3b3b', 'Not recorded':grey}],
+];
+let matrixColumns = [];
+
+function sortColumns(list, rowGenes, mode) {
+  const pattern = p => rowGenes.map(g => p.mutations[g] ? '1' : '0').join('');
+  const byPattern = (a, b) => pattern(b).localeCompare(pattern(a)) || a.id.localeCompare(b.id);
+  const stageRank = p => stages.indexOf(p.stage);
+  const sorters = {
+    pattern: byPattern,
+    stage: (a, b) => stageRank(a) - stageRank(b) || byPattern(a, b),
+    survival: (a, b) => (a.os_months ?? Infinity) - (b.os_months ?? Infinity) || byPattern(a, b),
+  };
+  return [...list].sort(sorters[mode]);
+}
+
+function renderMatrix() {
+  refreshScopes();
+  const scope = get('matrix-scope').value;
+  const shared = get('gene').value;
+  const pool = scopePatients(scope);
+  const profiled = pool.filter(p => p.mutation_profiled);
+  const counts = Object.fromEntries(genes.map(g => [g, profiled.filter(p => p.mutations[g]).length]));
+  const rowGenes = [...genes].sort((a, b) => counts[b] - counts[a]);
+  let columns = profiled;
+  if (get('matrix-hide').checked) columns = columns.filter(p => rowGenes.some(g => p.mutations[g]));
+  columns = sortColumns(columns, rowGenes, get('matrix-sort').value);
+  matrixColumns = columns;
+
+  const missing = pool.length - profiled.length;
+  get('matrix-summary').textContent = `Showing ${columns.length} of ${profiled.length} mutation-profiled patients in ${scopeLabel(scope)}`
+    + (missing ? `. ${missing} patient${missing === 1 ? ' has' : 's have'} no mutation profile and ${missing === 1 ? 'is' : 'are'} not shown.` : '.');
+
+  const width = 1180, left = 112, right = 52, top = 4;
+  const colW = Math.min(16, (width - left - right) / Math.max(columns.length, 1));
+  const gap = colW >= 4 ? Math.min(1, colW * .15) : 0;
+  const trackH = 11, geneH = 20, rowGap = 3, sectionGap = 12;
+  const geneTop = top + tracks.length * (trackH + rowGap) + sectionGap;
+  const height = geneTop + rowGenes.length * (geneH + rowGap);
+  const plotRight = left + colW * columns.length;
+  const x = i => left + i * colW;
+  let svg = '';
+
+  tracks.forEach(([label, value, palette], t) => {
+    const y = top + t * (trackH + rowGap);
+    svg += `<text x="${left - 8}" y="${y + trackH - 2}" text-anchor="end">${label}</text>`;
+    columns.forEach((p, i) => {
+      svg += `<rect x="${x(i)}" y="${y}" width="${colW - gap}" height="${trackH}" fill="${palette[value(p)] ?? grey}"/>`;
+    });
+  });
+
+  rowGenes.forEach((gene, r) => {
+    const y = geneTop + r * (geneH + rowGap);
+    const selected = gene === shared;
+    const rate = profiled.length ? (100 * counts[gene] / profiled.length).toFixed(0) + '%' : '—';
+    svg += `<g class="gene-label" data-gene="${gene}" tabindex="0" role="button" aria-label="Make ${gene} the shared gene" aria-pressed="${selected}">
+      <rect x="0" y="${y}" width="${left - 4}" height="${geneH}" rx="4" fill="${selected ? '#e7f0ed' : 'transparent'}" stroke="${selected ? '#628f82' : 'none'}"/>
+      <text x="${left - 8}" y="${y + geneH / 2 + 4}" text-anchor="end" font-weight="${selected ? 700 : 400}" font-style="italic">${gene}</text></g>`;
+    svg += `<rect x="${left}" y="${y}" width="${Math.max(0, plotRight - left)}" height="${geneH}" fill="#e4ebe8"/>`;
+    columns.forEach((p, i) => {
+      const found = p.mutations[gene];
+      if (found) svg += `<rect x="${x(i)}" y="${y + 2}" width="${colW - gap}" height="${geneH - 4}" fill="${mutationColors[mainClass(found)]}"/>`;
+    });
+    svg += `<text x="${plotRight + 6}" y="${y + geneH / 2 + 4}">${rate}</text>`;
+  });
+
+  svg += `<rect id="matrix-highlight" x="0" y="${top - 2}" width="${colW}" height="${height - top + 2}" fill="none" stroke="#876721" stroke-width="1.5" visibility="hidden"/>`;
+  svg += `<rect class="matrix-hit" x="${left}" y="${top}" width="${Math.max(0, plotRight - left)}" height="${height - top}" fill="transparent"/>`;
+  get('matrix').innerHTML = columns.length
+    ? `<svg viewBox="0 0 ${width} ${height + 4}" role="img" aria-label="Mutation matrix of ${columns.length} patients by ${rowGenes.length} genes. The patient table tab lists the same data." shape-rendering="crispEdges">${svg}</svg>`
+    : '<p>No patients match these settings.</p>';
+  get('matrix-tip').hidden = true;
+
+  get('matrix-legend').innerHTML = [
+    ['Mutation', mutationColors, v => v],
+    ...tracks.map(([label, , palette, format]) => [label, palette, format ?? (v => v)]),
+  ].map(([label, palette, format]) => `<div><strong>${label}</strong>${Object.entries(palette).map(([key, color]) =>
+    `<span><span class="swatch" style="background:${color}"></span>${format(key)}</span>`).join('')}</div>`).join('');
+}
+
+function matrixColumnAt(event) {
+  const svg = get('matrix').querySelector('svg');
+  const hit = svg?.querySelector('.matrix-hit');
+  if (!hit || !matrixColumns.length) return -1;
+  const point = svg.createSVGPoint();
+  point.x = event.clientX; point.y = event.clientY;
+  const local = point.matrixTransform(svg.getScreenCTM().inverse());
+  const left = +hit.getAttribute('x');
+  const colW = +hit.getAttribute('width') / matrixColumns.length;
+  const top = +hit.getAttribute('y');
+  if (local.y < top || local.y > top + +hit.getAttribute('height')) return -1;
+  const index = Math.floor((local.x - left) / colW);
+  return index >= 0 && index < matrixColumns.length ? index : -1;
+}
+
+function patientSummary(p) {
+  const mutated = genes.filter(g => p.mutations[g]);
+  return `<strong>${escapeHtml(p.id)}</strong><br>${stageLabel(p.stage)} · ${p.sex} · ${p.age ?? 'age unknown'}<br>
+    ${p.vital}${p.os_months !== null ? ` · ${p.os_months} months` : ''}
+    ${mutated.length ? `<ul>${mutated.map(g => `<li><em>${g}</em>: ${p.mutations[g].map(([kind, change]) =>
+      `${escapeHtml(change || 'unknown change')} (${kind.toLowerCase()})`).join(', ')}</li>`).join('')}</ul>`
+      : '<br>No mutations in the selected genes'}<br><small>Click to open in the patient table</small>`;
+}
+
+get('matrix').addEventListener('mousemove', event => {
+  const index = matrixColumnAt(event);
+  const highlight = get('matrix-highlight');
+  const tip = get('matrix-tip');
+  if (index < 0) { tip.hidden = true; highlight?.setAttribute('visibility', 'hidden'); return; }
+  const hit = get('matrix').querySelector('.matrix-hit');
+  const colW = +hit.getAttribute('width') / matrixColumns.length;
+  highlight.setAttribute('x', +hit.getAttribute('x') + index * colW);
+  highlight.setAttribute('width', colW);
+  highlight.setAttribute('visibility', 'visible');
+  tip.innerHTML = patientSummary(matrixColumns[index]);
+  tip.hidden = false;
+  const wrap = get('matrix-wrap');
+  const box = wrap.getBoundingClientRect();
+  const px = event.clientX - box.left + wrap.scrollLeft;
+  const flip = event.clientX - box.left > box.width - tip.offsetWidth - 20;
+  tip.style.left = (flip ? px - tip.offsetWidth - 14 : px + 14) + 'px';
+  tip.style.top = (event.clientY - box.top + 14) + 'px';
+});
+get('matrix').addEventListener('mouseleave', () => {
+  get('matrix-tip').hidden = true;
+  get('matrix-highlight')?.setAttribute('visibility', 'hidden');
+});
+get('matrix').addEventListener('click', event => {
+  const label = event.target.closest('.gene-label');
+  if (label) return setSharedGene(label.dataset.gene);
+  const index = matrixColumnAt(event);
+  if (index >= 0) openPatient(matrixColumns[index].id, get('matrix-scope').value);
+});
+get('matrix').addEventListener('keydown', event => {
+  const label = event.target.closest('.gene-label');
+  if (!label || !['Enter', ' '].includes(event.key)) return;
+  event.preventDefault();
+  setSharedGene(label.dataset.gene);
+  get('matrix').querySelector(`.gene-label[data-gene="${label.dataset.gene}"]`)?.focus();
+});
+for (const id of ['matrix-scope', 'matrix-sort', 'matrix-hide']) get(id).onchange = renderMatrix;
+
+// ---------- Patient table ----------
+const tableSort = {key: 'id', dir: 1};
+let focusedPatient = null;
+const mutatedGenes = p => genes.filter(g => p.mutations[g]);
+const expressionGene = () => get('table-gene').value;
+const tableColumns = [
+  {key: 'id', label: 'Patient ID', sort: p => p.id, csv: p => p.id,
+    html: p => `<a href="https://www.cbioportal.org/patient?studyId=lusc_tcga_pan_can_atlas_2018&amp;caseId=${encodeURIComponent(p.id)}" target="_blank" rel="noopener">${escapeHtml(p.id)}</a>`},
+  {key: 'stage', label: 'Stage', sort: p => stages.indexOf(p.stage), csv: p => p.stage, html: p => stageLabel(p.stage)},
+  {key: 'sex', label: 'Sex', sort: p => p.sex, csv: p => p.sex},
+  {key: 'age', label: 'Age', num: true, sort: p => p.age, csv: p => p.age},
+  {key: 'ethnicity', label: 'Ethnicity', sort: p => p.ethnicity, csv: p => p.ethnicity},
+  {key: 'radiation', label: 'Radiation', sort: p => p.radiation, csv: p => p.radiation},
+  {key: 'vital', label: 'Vital status', sort: p => p.vital, csv: p => p.vital},
+  {key: 'os', label: 'OS (months)', num: true, sort: p => p.os_months, csv: p => p.os_months},
+  {key: 'mutations', label: 'Mutations (selected genes)', sort: p => p.mutation_profiled ? mutatedGenes(p).length : null,
+    csv: p => p.mutation_profiled ? genes.flatMap(g => (p.mutations[g] ?? []).map(([k, c]) => `${g} ${c} (${k})`)).join('; ') : 'Not profiled',
+    html: p => !p.mutation_profiled ? '<small>Not profiled</small>'
+      : mutatedGenes(p).map(g => `<span class="chip" style="--c:${mutationColors[mainClass(p.mutations[g])]}" title="${
+        escapeHtml(p.mutations[g].map(([k, c]) => `${c} (${k})`).join(', '))}"><em>${g}</em> ${
+        escapeHtml(p.mutations[g].map(([, c]) => c.replace(/^p\./, '')).join(', '))}</span>`).join('') || '<small>None detected</small>'},
+  {key: 'expression', label: 'expression', num: true, sort: p => p.expression[expressionGene()] ?? null,
+    csv: p => p.expression[expressionGene()], html: p => p.expression[expressionGene()]?.toFixed(2)},
+];
+const missingValue = value => value === null || value === undefined;
+
+function tableRows() {
+  const terms = get('table-search').value.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const column = tableColumns.find(c => c.key === tableSort.key);
+  return scopePatients(get('table-scope').value)
+    .filter(p => {
+      if (!terms.length) return true;
+      const hay = [p.id, ...mutatedGenes(p), ...Object.values(p.mutations).flat(2)].join(' ').toLowerCase();
+      return terms.every(term => hay.includes(term));
+    })
+    .sort((a, b) => {
+      const va = column.sort(a), vb = column.sort(b);
+      if (missingValue(va) || missingValue(vb)) return missingValue(va) - missingValue(vb) || a.id.localeCompare(b.id);
+      return (typeof va === 'number' ? va - vb : String(va).localeCompare(String(vb))) * tableSort.dir || a.id.localeCompare(b.id);
+    });
+}
+
+function renderTable() {
+  refreshScopes();
+  const select = get('table-gene');
+  if (!select.options.length) select.replaceChildren(...selectOptions(genes));
+  select.value = get('gene').value;
+  const rows = tableRows();
+  const scope = get('table-scope').value;
+  get('table-count').textContent = `${rows.length} of ${scopePatients(scope).length} patients in ${scopeLabel(scope)}`;
+  const head = tableColumns.map(c => {
+    const label = c.key === 'expression' ? `<em>${select.value}</em> expression` : c.label;
+    const sorted = c.key === tableSort.key ? ` aria-sort="${tableSort.dir > 0 ? 'ascending' : 'descending'}"` : '';
+    return `<th scope="col"${sorted}${c.num ? ' class="num"' : ''}><button type="button" data-sort="${c.key}">${label}</button></th>`;
+  }).join('');
+  const body = rows.map(p => `<tr${p.id === focusedPatient ? ' class="focus"' : ''}>${tableColumns.map(c => {
+    const value = c.html ? c.html(p) : missingValue(c.csv(p)) ? undefined : escapeHtml(c.csv(p));
+    return `<td${c.num ? ' class="num"' : ''}>${value ?? '—'}</td>`;
+  }).join('')}</tr>`).join('');
+  get('patient-table').innerHTML = `<thead><tr>${head}</tr></thead><tbody>${body ||
+    `<tr><td colspan="${tableColumns.length}">No patients match.</td></tr>`}</tbody>`;
+}
+
+function openPatient(id, scope) {
+  focusedPatient = id;
+  refreshScopes();
+  get('table-scope').value = scope;
+  get('table-search').value = id;
+  showTab('patients');
+  get('table-search').focus();
+}
+
+get('patient-table').addEventListener('click', event => {
+  const key = event.target.closest('button[data-sort]')?.dataset.sort;
+  if (!key) return;
+  tableSort.dir = tableSort.key === key ? -tableSort.dir : 1;
+  tableSort.key = key;
+  renderTable();
+  get('patient-table').querySelector(`button[data-sort="${key}"]`).focus();
+});
+get('table-search').oninput = () => { focusedPatient = null; renderTable(); };
+get('table-scope').onchange = renderTable;
+get('table-gene').onchange = () => setSharedGene(get('table-gene').value);
+get('table-download').onclick = () => {
+  const quote = value => `"${String(value ?? '').replace(/"/g, '""')}"`;
+  const lines = [tableColumns.map(c => quote(c.key === 'expression' ? `${expressionGene()} expression log2(RSEM+1)` : c.label)).join(','),
+    ...tableRows().map(p => tableColumns.map(c => quote(c.csv(p))).join(','))];
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(new Blob([lines.join('\r\n')], {type: 'text/csv'}));
+  link.download = `tcga-lusc-patients-${get('table-scope').value.toLowerCase()}.csv`;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+};
+
+showTab(location.hash.slice(1));
