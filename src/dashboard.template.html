@@ -9,6 +9,13 @@
 *{box-sizing:border-box}body{margin:0;background:#f1f5f3}main{max-width:1440px;margin:auto;padding:36px 24px}header{margin-bottom:22px}h1{font-size:clamp(2rem,5vw,3.2rem);line-height:1.1;margin:4px 0 8px}h2,h3,p{margin:0 0 10px}h2{font-size:1.25rem}h3{font-size:1rem}.eyebrow{color:var(--a);font-weight:750}p,small{color:var(--muted)}.panel,.toolbar{background:#fff;border:1px solid var(--border);border-radius:12px;padding:18px}.toolbar{display:flex;align-items:end;flex-wrap:wrap;gap:14px;margin-bottom:16px}.layout{display:grid;grid-template-columns:minmax(0,2fr) minmax(285px,1fr);gap:16px}.cohorts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-bottom:16px}.cohort{border-top:4px solid var(--a)}.cohort.b{border-top-color:var(--b)}.filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}label{display:grid;font-weight:650;font-size:.85rem;gap:3px}select,button{font:inherit;border:1px solid #82988e;background:#fff;border-radius:6px;padding:6px;color:inherit}button{cursor:pointer}button:focus-visible,select:focus-visible{outline:3px solid #876721;outline-offset:2px}.aside{display:grid;align-content:start;gap:16px}.gene{display:grid;grid-template-columns:62px 1fr 54px;gap:6px;align-items:center;width:100%;margin:5px 0;text-align:left;border-color:transparent;padding:4px 5px}.gene[aria-pressed=true]{background:#e7f0ed;border-color:#628f82;font-weight:700}.track{background:#e9efed;height:10px;border-radius:4px}.fill{display:block;height:100%;background:var(--a);border-radius:4px}.b .fill{background:var(--b)}.value{text-align:right;font-size:.82rem}.legend{display:flex;gap:16px;font-size:.88rem;margin-bottom:8px}.legend span::before{content:'';display:inline-block;width:14px;border-top:3px solid var(--a);margin-right:6px;vertical-align:middle}.legend .b::before{border-top:3px dashed var(--b)}svg{width:100%;height:auto;display:block}.axis{stroke:#749087;stroke-width:1}.gridline{stroke:#dce6e2;stroke-width:1}svg text{font:11px system-ui;fill:#28423b}.metric{margin:8px 0}.metric strong{display:block;font-size:.88rem}.barline{display:grid;grid-template-columns:18px 1fr 40px;align-items:center;gap:5px;font-size:.78rem}.heat{width:100%;border-spacing:4px;text-align:center;font-size:.87rem}.heat th{text-align:left}.heat td{padding:3px;border:1px solid #d1ddd8;font-variant-numeric:tabular-nums}.risk{width:100%;font-size:.84rem;text-align:center;border-collapse:collapse}.risk th,.risk td{padding:4px 2px;border-bottom:1px solid var(--border)}.risk th:first-child{text-align:left}footer{margin-top:20px;font-size:.85rem}a{color:#155e52}@media(max-width:960px){.layout{grid-template-columns:1fr}.aside{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:640px){main{padding:20px 12px}.cohorts,.aside{grid-template-columns:1fr}}
 
 .intro{display:flex;align-items:start;justify-content:space-between;gap:16px}.total{min-width:155px;padding:12px 18px;background:white;border:1px solid var(--border);border-radius:12px}.total strong{display:block;font-size:1.8rem;line-height:1.1}.overview{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:18px 0}.distribution{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.distribution section{min-width:0}.composition{display:grid;gap:5px;margin:0;padding:0;list-style:none;font-size:.8rem}.composition li{display:grid;grid-template-columns:1fr auto;align-items:center;gap:5px}.composition .track{grid-column:1/-1;height:5px}.donut{width:84px;aspect-ratio:1;border-radius:50%;margin:0 0 10px;position:relative;background:var(--segments,#dce6e2)}.donut::after{content:"";position:absolute;inset:19%;border-radius:50%;background:white}.dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px}.stage-button{display:grid;grid-template-columns:1fr auto;gap:5px;width:100%;margin:6px 0;text-align:left}.stage-button[aria-pressed=true]{border-color:var(--a);background:#e7f0ed}.stage-tools{display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:8px}summary{cursor:pointer;font-weight:650}details>p,details>div{margin-top:10px}.cohort-summary{margin-top:16px}.cohort-summary table{min-width:460px}.scroll-table{overflow:auto}.cohort-summary th,.cohort-summary td{padding:7px}.cohort-summary td{text-align:right}.detail-note{font-size:.85rem}.selection-detail{margin-top:12px}@media(max-width:680px){.intro{flex-wrap:wrap}.overview{grid-template-columns:1fr}}
+
+.tabs{display:flex;gap:4px;margin:18px 0 16px;border-bottom:2px solid var(--border);overflow-x:auto;overflow-y:hidden;padding-top:2px}.tabs button{border:0;border-bottom:3px solid transparent;border-radius:6px 6px 0 0;margin-bottom:-2px;padding:9px 16px;font-weight:650;color:var(--muted);background:none;white-space:nowrap}.tabs button[aria-selected=true]{color:var(--a);border-bottom-color:var(--a);background:#fff}.tabs button:hover{color:#192d29}
+input[type=search]{font:inherit;border:1px solid #82988e;border-radius:6px;padding:6px;color:inherit;max-width:100%}input:focus-visible{outline:3px solid #876721;outline-offset:2px}label.check{display:flex;align-items:center;gap:6px;font-weight:500;padding-bottom:8px}
+.matrix-legend{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:.8rem;margin:4px 0 10px}.matrix-legend div{display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center}.matrix-legend strong{font-size:.8rem}.swatch{display:inline-block;width:10px;height:12px;margin-right:4px;vertical-align:-2px;border-radius:2px}
+.matrix-wrap{position:relative;overflow-x:auto}.matrix-wrap svg{min-width:640px}.gene-label{cursor:pointer}.gene-label:hover text,.gene-label:focus text{text-decoration:underline}.gene-label:focus{outline:none}.gene-label:focus-visible rect{stroke:#876721;stroke-width:2}.matrix-hit{cursor:pointer}
+.tip{position:absolute;z-index:2;pointer-events:none;background:#192d29;color:#fff;border-radius:8px;padding:8px 10px;font-size:.8rem;line-height:1.4;max-width:280px;box-shadow:0 4px 14px rgba(0,0,0,.18)}.tip strong{color:#fff}.tip small{color:#c9dcd5}.tip ul{margin:4px 0 0;padding-left:16px}
+.patient-scroll{max-height:70vh}.patients{width:100%;border-collapse:collapse;font-size:.85rem;min-width:980px}.patients th{position:sticky;top:0;background:#fff;z-index:1;text-align:left;border-bottom:2px solid var(--border);padding:0}.patients th button{width:100%;border:0;border-radius:0;text-align:left;font-weight:700;padding:8px 6px;background:none}.patients th[aria-sort] button::after{content:" ▲";font-size:.7em}.patients th[aria-sort=descending] button::after{content:" ▼"}.patients td{padding:6px;border-bottom:1px solid #e4ebe8;vertical-align:top}.patients td.num{text-align:right;font-variant-numeric:tabular-nums}.patients th.num button{text-align:right}.patients tbody tr:hover{background:#f5f9f7}.patients tr.focus{background:#fff4d6}.chip{display:inline-block;margin:1px 4px 1px 0;padding:0 6px;border-radius:4px;border-left:4px solid var(--c);background:#eef3f1;font-size:.78rem;white-space:nowrap}
 </style>
 </head>
 <body>
@@ -20,6 +27,12 @@
 <details><summary>About lung squamous cell carcinoma</summary>
 <p>Lung squamous cell carcinoma is a type of non-small cell lung cancer that starts in the flat cells lining the inside of the lungs. <a href="https://www.cancer.gov/types/lung/patient/non-small-cell-lung-treatment-pdq">National Cancer Institute</a>.</p>
 </details></header>
+<nav class="tabs" role="tablist" aria-label="Dashboard views">
+<button type="button" role="tab" id="tab-overview" aria-controls="view-overview" aria-selected="true">Cohort comparison</button>
+<button type="button" role="tab" id="tab-matrix" aria-controls="view-matrix" aria-selected="false" tabindex="-1">Mutation matrix</button>
+<button type="button" role="tab" id="tab-patients" aria-controls="view-patients" aria-selected="false" tabindex="-1">Patient table</button>
+</nav>
+<div id="view-overview" role="tabpanel" aria-labelledby="tab-overview">
 <div class="toolbar">
 <label>Shared gene<select id="gene"></select></label>
 <label>Group expression by<select id="group"><option value="stage_boxes">Pathologic stage</option><option value="status_boxes">Mutation status</option></select></label>
@@ -52,6 +65,34 @@
 </div>
 <details class="panel cohort-summary"><summary>Cohort breakdown</summary>
 <div id="summary-table" class="scroll-table"></div></details>
+</div>
+<div id="view-matrix" role="tabpanel" aria-labelledby="tab-matrix" hidden>
+<div class="toolbar">
+<label>Show patients from<select id="matrix-scope" class="scope"></select></label>
+<label>Sort patients by<select id="matrix-sort"><option value="pattern">Mutation pattern</option><option value="stage">Pathologic stage</option><option value="survival">Overall survival time</option></select></label>
+<label class="check"><input type="checkbox" id="matrix-hide"> Hide patients with no mutations in these genes</label>
+</div>
+<section class="panel">
+<h2>Mutation matrix</h2>
+<p id="matrix-summary"></p>
+<div id="matrix-legend" class="matrix-legend"></div>
+<div class="matrix-wrap" id="matrix-wrap"><div id="matrix"></div><div id="matrix-tip" class="tip" hidden></div></div>
+<p><small>Each column is one mutation-profiled patient; rows are genes ordered by mutation frequency in the shown group. When a patient has several mutations in one gene, the cell shows the most severe type (truncating, then splice, missense, in-frame). Click a gene name to make it the shared gene. Click a patient's column to open them in the patient table.</small></p>
+</section>
+</div>
+<div id="view-patients" role="tabpanel" aria-labelledby="tab-patients" hidden>
+<div class="toolbar">
+<label>Show patients from<select id="table-scope" class="scope"></select></label>
+<label>Search<input id="table-search" type="search" placeholder="Patient ID, gene or protein change" size="30"></label>
+<label>Expression column<select id="table-gene"></select></label>
+<button id="table-download" type="button">Download CSV</button>
+<p id="table-count" aria-live="polite"></p>
+</div>
+<section class="panel">
+<div class="scroll-table patient-scroll"><table class="patients" id="patient-table"></table></div>
+<p><small>Expression is log₂(RSEM + 1). Mutations are listed for the eight selected genes only. “—” means not recorded or not profiled. Patient IDs link to cBioPortal.</small></p>
+</section>
+</div>
 <footer>Data generated by the TCGA Research Network. <a href="https://www.cbioportal.org/study/summary?id=lusc_tcga_pan_can_atlas_2018">cBioPortal TCGA-LUSC PanCancer Atlas study</a>.</footer>
 </main>
 <script id="dashboard-data" type="application/json">__DASHBOARD_DATA__</script>

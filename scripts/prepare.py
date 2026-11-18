@@ -16,6 +16,14 @@ DATAHUB = f"https://media.githubusercontent.com/media/cBioPortal/datahub/master/
 GENES = {"TP53": 7157, "PIK3CA": 5290, "KEAP1": 9817, "NFE2L2": 4780,
          "CDKN2A": 1029, "PTEN": 5728, "NOTCH1": 4851, "RB1": 5925}
 STAGES = ("I", "II", "III", "IV", "Unknown")
+MUTATION_CLASSES = {
+    "Missense_Mutation": "Missense",
+    "Nonsense_Mutation": "Truncating", "Frame_Shift_Del": "Truncating",
+    "Frame_Shift_Ins": "Truncating", "Nonstop_Mutation": "Truncating",
+    "Splice_Site": "Splice", "Splice_Region": "Splice",
+    "In_Frame_Del": "In-frame", "In_Frame_Ins": "In-frame",
+}
+VITAL_STATUS = {"0:LIVING": "Living", "1:DECEASED": "Deceased"}
 
 def download(filename, url):
     path = CACHE / filename
@@ -27,7 +35,7 @@ def download(filename, url):
     return path
 
 def tsv(path):
-    with path.open(newline="") as stream:
+    with path.open(newline="", encoding="utf-8") as stream:
         yield from csv.DictReader((line for line in stream if not line.startswith("#")), delimiter="\t")
 
 def stage_group(value):
@@ -94,7 +102,7 @@ def prepare():
     with ThreadPoolExecutor(max_workers=5) as pool:
         files = dict(zip(jobs, pool.map(lambda job: download(*job), jobs.items())))
 
-    records = json.loads(files["clinical.json"].read_text())
+    records = json.loads(files["clinical.json"].read_text(encoding="utf-8"))
     if len(records) >= 25000:
         raise ValueError("Clinical response may be incomplete; request paginated records.")
     clinical = {}
@@ -108,12 +116,12 @@ def prepare():
     if any(count > 1 for count in multiplicity.values()):
         raise ValueError("Define a rule for patients with multiple primary samples before proceeding.")
     sample_stage = {sample: patients[patient] for sample, patient in pairs}
-    sequenced_line = next(line for line in files["cases_sequenced.txt"].read_text().splitlines()
+    sequenced_line = next(line for line in files["cases_sequenced.txt"].read_text(encoding="utf-8").splitlines()
                           if line.startswith("case_list_ids:"))
     sequenced = set(sequenced_line.split(":", 1)[1].split()) & sample_stage.keys()
     by_id = {str(entrez): gene for gene, entrez in GENES.items()}
     expression = {}
-    with files["data_mrna_seq_v2_rsem.txt"].open(newline="") as stream:
+    with files["data_mrna_seq_v2_rsem.txt"].open(newline="", encoding="utf-8") as stream:
         reader = csv.DictReader(stream, delimiter="\t")
         matrix_samples = set(reader.fieldnames or ()) & sample_stage.keys()
         for row in reader:
@@ -143,12 +151,17 @@ def prepare():
     survival = {sample: record for sample, fields in fields_by_sample.items()
                 if (record := survival_record(fields)) is not None}
     mutations_by_gene = {}
+    mutation_details = {}
     log_expression = {}
     for gene in GENES:
-        mutations = json.loads(files[f"{gene}.json"].read_text())
+        mutations = json.loads(files[f"{gene}.json"].read_text(encoding="utf-8"))
         if not isinstance(mutations, list):
             raise ValueError(f"Unexpected mutation response for {gene}")
         mutations_by_gene[gene] = {row["sampleId"] for row in mutations} & sequenced
+        for row in mutations:
+            if row["sampleId"] in sequenced:
+                mutation_details.setdefault(row["sampleId"], {}).setdefault(gene, []).append(
+                    [MUTATION_CLASSES.get(row.get("mutationType"), "Other"), row.get("proteinChange") or ""])
         log_expression[gene] = {sample: math.log2(value + 1)
                                 for sample, value in expression[gene].items()
                                 if math.isfinite(value) and value >= 0}
@@ -202,13 +215,32 @@ def prepare():
         }
     audit = {"clinical_patients": len(patients), "stage_counts": stage_counts,
              "overall_survival_usable": len(survival)}
-    data = {"filters": filters, "cohorts": cohorts}
-    (ROOT / "data" / "join_audit.json").write_text(json.dumps(audit, indent=2) + "\n")
-    template = (ROOT / "src" / "dashboard.template.html").read_text()
-    javascript = (ROOT / "src" / "dashboard.js").read_text()
+    patient_rows = []
+    for sample, patient in sorted(pairs, key=lambda pair: pair[1]):
+        fields = clinical[patient]
+        try:
+            age = float(fields.get("AGE", ""))
+        except ValueError:
+            age = math.nan
+        os_record = survival.get(sample)
+        patient_rows.append({
+            "id": patient, "stage": sample_stage[sample], "sex": sex_by_sample[sample],
+            "age_group": age_by_sample[sample], "age": int(age) if math.isfinite(age) else None,
+            "ethnicity": ethnicity_by_sample[sample], "radiation": radiation_by_sample[sample],
+            "vital": VITAL_STATUS.get(fields.get("OS_STATUS"), "Not recorded"),
+            "os_months": round(os_record[0], 1) if os_record else None,
+            "mutation_profiled": sample in sequenced, "rna_profiled": sample in matrix_samples,
+            "mutations": mutation_details.get(sample, {}),
+            "expression": {gene: round(log_expression[gene][sample], 3)
+                           for gene in GENES if sample in log_expression[gene]},
+        })
+    data = {"filters": filters, "cohorts": cohorts, "patients": patient_rows}
+    (ROOT / "data" / "join_audit.json").write_text(json.dumps(audit, indent=2) + "\n", encoding="utf-8")
+    template = (ROOT / "src" / "dashboard.template.html").read_text(encoding="utf-8")
+    javascript = (ROOT / "src" / "dashboard.js").read_text(encoding="utf-8")
     html = template.replace("__DASHBOARD_CODE__", javascript)
     (ROOT / "docs" / "index.html").write_text(
-        html.replace("__DASHBOARD_DATA__", json.dumps(data, separators=(",", ":"))))
+        html.replace("__DASHBOARD_DATA__", json.dumps(data, separators=(",", ":"))), encoding="utf-8")
     print(json.dumps(audit, indent=2))
 
 if __name__ == "__main__":
